@@ -42,6 +42,49 @@ def human_utuc_imc():
     return adata
 
 
+def mouse_v1_starmap():
+    """
+    Raw mouse V1 neocortex dataset from Wang et al. (Science, 2018), containing 1 slice replicate with the layer labels.
+
+    This downloads 9.6 MB of data upon the first call of the function and stores it in `./scniche_data/STARmap.h5ad`.
+    :return: AnnData
+    """
+    url = "https://figshare.com/ndownloader/files/50249244"
+    datasetdir = './scniche_data/STARmap.h5ad'
+    adata = sc.read(datasetdir, backup_url=url)
+    return adata
+
+
+def human_dlpfc_visium():
+    """
+    Raw human DLPFC dataset from Maynard et al. (Nat Neurosci., 2021),
+    containing 4 slices (Slice 151673, 151674, 151675, and 151676) from the same donor with the layer labels.
+    The scVI (Nat Methods., 2018) embedding as well as the Cell2location (Nat Biotechnol., 2022) deconvolution results
+    are also provided.
+
+    This downloads 71.93 MB of data upon the first call of the function and stores it in `./scniche_data/DLPFC.h5ad`.
+    :return: AnnData
+    """
+    url = "https://figshare.com/ndownloader/files/50249673"
+    datasetdir = './scniche_data/DLPFC.h5ad'
+    adata = sc.read(datasetdir, backup_url=url)
+    return adata
+
+
+def mouse_aging_merfish():
+    """
+    processed mouse aging brain dataset from Allen et al. (Cell, 2023), containing 31 slices with the tissue labels.
+    The data has been normalized and scaled by the original authors, and the PCA results are also provided.
+
+    This downloads 281.56 MB of data upon the first call of the function and stores it in `./scniche_data/MERFISH_Aging.h5ad`.
+    :return: AnnData
+    """
+    url = "https://figshare.com/ndownloader/files/50251680"
+    datasetdir = './scniche_data/MERFISH_Aging.h5ad'
+    adata = sc.read(datasetdir, backup_url=url)
+    return adata
+
+
 def human_tnbc_mibi_tof():
     """
     Processed human triple-negative breast cancer (TNBC) MIBI-TOF dataset from Keren et al. (Cell, 2018),

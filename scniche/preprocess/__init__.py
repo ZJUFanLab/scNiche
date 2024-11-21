@@ -9,6 +9,7 @@ __all__ = [
     "process_multi_slices",
     "construct_graph",
     "random_split",
+    "random_split2",
     "myDataset",
     "prepare_data",
     "prepare_data_batch",

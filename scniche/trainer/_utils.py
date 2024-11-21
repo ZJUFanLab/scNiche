@@ -1,6 +1,7 @@
 import torch
 import pandas as pd
 import numpy as np
+import scanpy as sc
 from anndata import AnnData
 from tqdm import tqdm
 from sklearn.cluster import KMeans
@@ -104,11 +105,27 @@ def cluster_stability(
 
 def clustering(adata: AnnData,
                target_k: int,
+               clustering_method: str = 'kmeans',
+               resolution: float = 0.5,
+               n_neighbor: int = 20,
                use_rep: str = 'X_scniche',
                add_key: str = 'scNiche',
                ):
+    assert (clustering_method.lower() in ['kmeans', 'leiden']), 'clustering_method must be `kmeans` or `leiden`!'
     X = adata.obsm[use_rep]
-    label = KMeans(n_clusters=target_k, random_state=123).fit_predict(X)
+    label = None
+
+    if clustering_method.lower() == 'kmeans':
+        print(f"Applying K-Means Clustering with {target_k} target cluster numbers...")
+        label = KMeans(n_clusters=target_k, random_state=123).fit_predict(X)
+
+    elif clustering_method.lower() == 'leiden':
+        print(f"Applying Leiden Clustering with {resolution} resolution...")
+        adata_tmp = sc.AnnData(X)
+        sc.pp.neighbors(adata_tmp, n_neighbors=n_neighbor)
+        sc.tl.leiden(adata_tmp, resolution=resolution)
+        label = list(adata_tmp.obs['leiden'].values)
+
     order = sorted(list(set(label)))
     category = ['Niche' + str(i) for i in order]
 
@@ -117,3 +134,4 @@ def clustering(adata: AnnData,
     adata.obs[add_key] = pd.Categorical(adata.obs[add_key], categories=category, ordered=True)
 
     return adata
+

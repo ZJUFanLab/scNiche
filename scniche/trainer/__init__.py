@@ -3,7 +3,7 @@ from ._train import *
 from ._utils import *
 
 __all__ = [
-    "GAE",
+    "MGAE",
     "FeatureFusion",
     "InnerProductDecoder",
     "GFN",

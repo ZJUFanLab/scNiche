@@ -11,29 +11,32 @@ class Runner:
     def __init__(
             self,
             adata: AnnData,
+            choose_views: Optional[list] = None,
             hidden_size_v: Optional[list] = None,
             hidden_size: Optional[list] = None,
             device: str = 'cuda:0',
             verbose: bool = True
     ):
-        self.views = 3
         self.adata = adata
-        self.g1 = self.adata.uns['g1']
-        self.g2 = self.adata.uns['g2']
-        self.g3 = self.adata.uns['g3']
+        self.choose_views = choose_views
+        if self.choose_views is None:
+            self.choose_views = ['X_cn_norm', 'X_data', 'X_data_nbr']
+        else:
+            missing_views = [view for view in self.choose_views if view not in adata.obsm.keys()]
+            if missing_views:
+                raise ValueError(f"The following views are missing in adata.obsm: {', '.join(missing_views)}")
 
-        self.feat1 = self.g1.ndata['feat']
-        self.feat2 = self.g2.ndata['feat']
-        self.feat3 = self.g3.ndata['feat']
-        self.in_feats = [self.feat1.shape[1], self.feat2.shape[1], self.feat3.shape[1]]
+        self.views = len(self.choose_views)
 
-        self.adj1 = self.g1.ndata['adj'].to_dense()
-        self.adj2 = self.g2.ndata['adj'].to_dense()
-        self.adj3 = self.g3.ndata['adj'].to_dense()
+        self.graph_name = ['g_' + view for view in self.choose_views]
+        self.graph = [self.adata.uns[graph_name] for graph_name in self.graph_name]
+        self.adj = [g.ndata['adj'].to_dense() for g in self.graph]
+        self.mik = np.hstack((g.ndata['mik'] for g in self.graph))
+        self.edges = sum(g.number_of_edges() for g in self.graph)
 
-        self.mik = np.hstack((self.g1.ndata['mik'], self.g2.ndata['mik'], self.g3.ndata['mik']))
+        self.feat = [g.ndata['feat'] for g in self.graph]
+        self.in_feats = [feat.shape[1] for feat in self.feat]
 
-        self.edges = self.g1.number_of_edges() + self.g2.number_of_edges() + self.g3.number_of_edges()
         self.device = device
         self.hidden_size_v = hidden_size_v
         self.hidden_size = hidden_size
@@ -48,29 +51,25 @@ class Runner:
         if self.verbose:
             print("-------Prepare training...")
             print("Views: {}".format(self.views))
-            print("Views-1 DataSize: {} * {}".format(self.feat1.shape[0], self.feat1.shape[1]))
-            print("Views-2 DataSize: {} * {}".format(self.feat2.shape[0], self.feat2.shape[1]))
-            print("Views-3 DataSize: {} * {}".format(self.feat3.shape[0], self.feat3.shape[1]))
-            print("Views-1 Graph Edges: {}".format(self.g1.number_of_edges()))
-            print("Views-2 Graph Edges: {}".format(self.g2.number_of_edges()))
-            print("Views-3 Graph Edges: {}".format(self.g3.number_of_edges()))
+            for i in range(len(self.choose_views)):
+                print("View-{}: {}, DataSize: {} * {}; Graph Edges: {}".format(
+                    i,
+                    self.choose_views[i],
+                    self.feat[i].shape[0],
+                    self.feat[i].shape[1],
+                    self.graph[i].number_of_edges()
+                ))
             print("Mutual Information Matrix Size for training: {}".format(self.mik.shape))
 
-    def fit(self, lr: Optional[float] = 0.01, epochs: Optional[int] = 200,):
+    def fit(self, lr: Optional[float] = 0.01, epochs: Optional[int] = 100, ):
 
         # to device
-        self.feat1 = self.feat1.to(self.device)
-        self.feat2 = self.feat2.to(self.device)
-        self.feat3 = self.feat3.to(self.device)
-        self.g1 = self.g1.to(self.device)
-        self.g2 = self.g2.to(self.device)
-        self.g3 = self.g3.to(self.device)
-        self.adj1 = self.adj1.to(self.device)
-        self.adj2 = self.adj2.to(self.device)
-        self.adj3 = self.adj3.to(self.device)
+        self.feat = [feat.to(self.device) for feat in self.feat]
+        self.graph = [g.to(self.device) for g in self.graph]
+        self.adj = [adj.to(self.device) for adj in self.adj]
 
         # model
-        self.model = GAE(self.in_feats, self.hidden_size_v, self.hidden_size, self.views, self.adj1.shape[0])
+        self.model = MGAE(self.in_feats, self.hidden_size_v, self.hidden_size, self.views, self.adj[0].shape[0])
         self.model_d = Discriminator(latent_dim=self.hidden_size[-1])
         self.model = self.model.to(self.device)
         self.model_d = self.model_d.to(self.device)
@@ -79,7 +78,7 @@ class Runner:
         optim = torch.optim.Adam(self.model.parameters(), lr=lr)
         # loss
         pos_weight = torch.Tensor(
-            [float(self.g1.adjacency_matrix().to_dense().shape[0] ** 2 - self.edges / 2) / self.edges * 2]
+            [float(self.graph[0].adjacency_matrix().to_dense().shape[0] ** 2 - self.edges / 2) / self.edges * 2]
         )
         criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight).to(self.device)
         criterion_m = torch.nn.MSELoss().to(self.device)
@@ -91,25 +90,21 @@ class Runner:
         loss_all = []
         pbar = tqdm(range(epochs))
         for epoch in pbar:
-            adj_r, adj_logits, z = self.model.forward(self.g1, self.g2, self.g3,
-                                                      self.feat1, self.feat2, self.feat3, self.device)
-            loss_gre = (criterion_m(adj_r, self.adj1) + criterion_m(adj_r, self.adj2) + criterion_m(
-                adj_r, self.adj3)) / self.views
+            adj_r, adj_logits, z = self.model.forward(self.graph, self.feat, self.device)
+            loss_gre = sum(criterion_m(adj_r, adj) for adj in self.adj) / self.views
+            loss_rec = sum(criterion(adj_logits[i], adj) for i, adj in enumerate(self.adj)) / self.views
 
-            loss_rec = (criterion(adj_logits[0], self.adj1) + criterion(adj_logits[1], self.adj2) + criterion(
-                adj_logits[2], self.adj3)) / self.views
-
-            global_info_loss = 0
+            loss_mim = 0
             for i in range(self.mik.shape[1]):
-                z_shuffle = shuffling(z, latent=self.hidden_size[-1], device=self.device)
-                z_z_shuffle = torch.cat((z, z_shuffle), 1)
-                z_z_shuffle_scores = self.model_d(z_z_shuffle)
-                z_z = torch.cat((z, z[self.mik[:, i]]), 1)
-                z_z_scores = self.model_d(z_z)
-                global_info_loss += - torch.mean(
-                    torch.log(z_z_scores + 1e-6) + torch.log(1 - z_z_shuffle_scores + 1e-6)
+                z_shuf = shuffling(z, latent=self.hidden_size[-1], device=self.device)
+                z_comb = torch.cat((z, z_shuf), 1)
+                z_shuf_scores = self.model_d(z_comb)
+                z_idx = torch.cat((z, z[self.mik[:, i]]), 1)
+                z_scores = self.model_d(z_idx)
+                loss_mim += - torch.mean(
+                    torch.log(z_scores + 1e-6) + torch.log(1 - z_shuf_scores + 1e-6)
                 )
-            loss = loss_gre + loss_rec + global_info_loss
+            loss = loss_gre + loss_rec + loss_mim
             optim.zero_grad()
             loss.backward()
             optim.step()
@@ -121,7 +116,7 @@ class Runner:
             print("Training done.")
 
         self.model.eval()
-        _, _, z = self.model.forward(self.g1, self.g2, self.g3, self.feat1, self.feat2, self.feat3, self.device)
+        _, _, z = self.model.forward(self.graph, self.feat, self.device)
 
         self.adata.uns['loss'] = loss_all
         self.adata.obsm['X_scniche'] = z.data.cpu().numpy()
@@ -132,19 +127,26 @@ class Runner_batch:
     def __init__(
             self,
             adata: AnnData,
+            choose_views: Optional[list] = None,
             hidden_size_v: Optional[list] = None,
             hidden_size: Optional[list] = None,
             device: str = 'cuda:0',
             verbose: bool = True
     ):
-        self.views = 3
         self.adata = adata
         self.dataloader = self.adata.uns['dataloader']
+        self.choose_views = choose_views
+        if self.choose_views is None:
+            self.choose_views = ['X_cn_norm', 'X_data', 'X_data_nbr']
+        else:
+            missing_views = [view for view in self.choose_views if view not in adata.obsm.keys()]
+            if missing_views:
+                raise ValueError(f"The following views are missing in adata.obsm: {', '.join(missing_views)}")
 
-        self.feat1 = self.adata.obsm['X_cn_norm']
-        self.feat2 = self.adata.obsm['X_data']
-        self.feat3 = self.adata.obsm['X_data_nbr']
-        self.in_feats = [self.feat1.shape[1], self.feat2.shape[1], self.feat3.shape[1]]
+        self.views = len(self.choose_views)
+
+        self.feat = [self.adata.obsm[view] for view in self.choose_views]
+        self.in_feats = [feat.shape[1] for feat in self.feat]
 
         self.device = device
         self.hidden_size_v = hidden_size_v
@@ -160,16 +162,20 @@ class Runner_batch:
         if self.verbose:
             print("-------Prepare training...")
             print("Views: {}".format(self.views))
-            print("Views-1 DataSize: {} * {}".format(self.feat1.shape[0], self.feat1.shape[1]))
-            print("Views-2 DataSize: {} * {}".format(self.feat2.shape[0], self.feat2.shape[1]))
-            print("Views-3 DataSize: {} * {}".format(self.feat3.shape[0], self.feat3.shape[1]))
+            for i in range(len(self.choose_views)):
+                print("View-{}: {}, DataSize: {} * {}".format(
+                    i,
+                    self.choose_views[i],
+                    self.feat[i].shape[0],
+                    self.feat[i].shape[1],
+                ))
             print("Batch size: {}".format(len(self.dataloader)))
 
-    def fit(self, lr: Optional[float] = 0.01, epochs: Optional[int] = 200,):
+    def fit(self, lr: Optional[float] = 0.01, epochs: Optional[int] = 100, ):
 
         # model
         batch_size = len(self.adata.uns['batch_idx'][0])
-        self.model = GAE(self.in_feats, self.hidden_size_v, self.hidden_size, self.views, batch_size)
+        self.model = MGAE(self.in_feats, self.hidden_size_v, self.hidden_size, self.views, batch_size)
         self.model_d = Discriminator(latent_dim=self.hidden_size[-1])
         self.model = self.model.to(self.device)
         self.model_d = self.model_d.to(self.device)
@@ -186,57 +192,41 @@ class Runner_batch:
         for epoch in pbar:
             batch_loss = 0
             for batch in self.dataloader:
-                g1 = batch[0]
-                g2 = batch[1]
-                g3 = batch[2]
 
-                feat1 = g1.ndata['feat']
-                feat2 = g2.ndata['feat']
-                feat3 = g3.ndata['feat']
-
-                adj1 = g1.ndata['adj'].to_dense()
-                adj2 = g2.ndata['adj'].to_dense()
-                adj3 = g3.ndata['adj'].to_dense()
-
-                mik = np.hstack((g1.ndata['mik'], g2.ndata['mik'], g3.ndata['mik']))
-                edges = g1.number_of_edges() + g2.number_of_edges() + g3.number_of_edges()
+                graphs = [batch[i] for i in range(len(batch))]
+                feats = [g.ndata['feat'] for g in graphs]
+                adjs = [g.ndata['adj'].to_dense() for g in graphs]
+                mik = np.hstack((g.ndata['mik'] for g in graphs))
+                edges = sum(g.number_of_edges() for g in graphs)
 
                 # loss
                 pos_weight = torch.Tensor(
-                    [float(g1.adjacency_matrix().to_dense().shape[0] ** 2 - edges / 2) / edges * 2]
+                    [float(graphs[0].adjacency_matrix().to_dense().shape[0] ** 2 - edges / 2) / edges * 2]
                 )
                 criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight).to(self.device)
                 criterion_m = torch.nn.MSELoss().to(self.device)
 
                 # to device
-                feat1 = feat1.to(self.device)
-                feat2 = feat2.to(self.device)
-                feat3 = feat3.to(self.device)
-                g1 = g1.to(self.device)
-                g2 = g2.to(self.device)
-                g3 = g3.to(self.device)
-                adj1 = adj1.to(self.device)
-                adj2 = adj2.to(self.device)
-                adj3 = adj3.to(self.device)
+                feats = [feat.to(self.device) for feat in feats]
+                graphs = [g.to(self.device) for g in graphs]
+                adjs = [adj.to(self.device) for adj in adjs]
 
-                adj_r, adj_logits, z = self.model.forward(g1, g2, g3, feat1, feat2, feat3, self.device)
-                loss_gre = (criterion_m(adj_r, adj1) + criterion_m(adj_r, adj2) + criterion_m(
-                    adj_r, adj3)) / self.views
-                loss_rec = (criterion(adj_logits[0], adj1) + criterion(adj_logits[1], adj2) + criterion(
-                    adj_logits[2], adj3)) / self.views
+                adj_r, adj_logits, z = self.model.forward(graphs, feats, self.device)
+                loss_gre = sum(criterion_m(adj_r, adj) for adj in adjs) / self.views
+                loss_rec = sum(criterion(adj_logits[i], adj) for i, adj in enumerate(adjs)) / self.views
 
-                global_info_loss = 0
+                loss_mim = 0
                 for i in range(mik.shape[1]):
-                    z_shuffle = shuffling(z, latent=self.hidden_size[-1], device=self.device)
-                    z_z_shuffle = torch.cat((z, z_shuffle), 1)
-                    z_z_shuffle_scores = self.model_d(z_z_shuffle)
-                    z_z = torch.cat((z, z[mik[:, i]]), 1)
-                    z_z_scores = self.model_d(z_z)
-                    global_info_loss += - torch.mean(
-                        torch.log(z_z_scores + 1e-6) + torch.log(1 - z_z_shuffle_scores + 1e-6)
+                    z_shuf = shuffling(z, latent=self.hidden_size[-1], device=self.device)
+                    z_comb = torch.cat((z, z_shuf), 1)
+                    z_shuf_scores = self.model_d(z_comb)
+                    z_idx = torch.cat((z, z[mik[:, i]]), 1)
+                    z_scores = self.model_d(z_idx)
+                    loss_mim += - torch.mean(
+                        torch.log(z_scores + 1e-6) + torch.log(1 - z_shuf_scores + 1e-6)
                     )
 
-                loss = loss_gre + loss_rec + global_info_loss
+                loss = loss_gre + loss_rec + loss_mim
                 optim.zero_grad()
                 loss.backward()
                 optim.step()
@@ -253,22 +243,12 @@ class Runner_batch:
         self.model.eval()
         emb = []
         for batch in tqdm(self.dataloader):
-            g1 = batch[0]
-            g2 = batch[1]
-            g3 = batch[2]
+            graphs = [batch[i] for i in range(len(batch))]
+            feats = [g.ndata['feat'] for g in graphs]
+            graphs = [g.to(self.device) for g in graphs]
+            feats = [feat.to(self.device) for feat in feats]
 
-            feat1 = g1.ndata['feat']
-            feat2 = g2.ndata['feat']
-            feat3 = g3.ndata['feat']
-
-            g1 = g1.to(self.device)
-            g2 = g2.to(self.device)
-            g3 = g3.to(self.device)
-            feat1 = feat1.to(self.device)
-            feat2 = feat2.to(self.device)
-            feat3 = feat3.to(self.device)
-
-            _, _, z = self.model.forward(g1, g2, g3, feat1, feat2, feat3, self.device)
+            _, _, z = self.model.forward(graphs, feats, self.device)
             emb.append(list(z.data.cpu().numpy()))
 
         emb = np.array(emb)
@@ -283,17 +263,3 @@ class Runner_batch:
         self.adata.uns['loss'] = loss_all
         self.adata.obsm['X_scniche'] = np.array(emb)
         return self.adata
-
-
-
-
-
-
-
-
-
-
-
-
-
-

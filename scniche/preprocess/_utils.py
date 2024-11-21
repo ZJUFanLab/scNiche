@@ -7,6 +7,7 @@ import scanpy as sc
 from anndata import AnnData
 from tqdm import tqdm
 from sklearn.decomposition import PCA
+from scipy.sparse import issparse
 from torch.utils.data import Dataset, DataLoader
 from sklearn.neighbors import NearestNeighbors
 from typing import Optional, Union
@@ -38,8 +39,8 @@ def cal_spatial_neighbors(
 
     # CNs
     meta = adata.obs.copy()
-    meta['x_new'] = adata.obsm['spatial'][:, 0]
-    meta['y_new'] = adata.obsm['spatial'][:, 1]
+    meta['x_new'] = list(adata.obsm['spatial'][:, 0])
+    meta['y_new'] = list(adata.obsm['spatial'][:, 1])
 
     if celltype_order is None:
         celltype_order = sorted(meta[celltype_key].unique())
@@ -109,7 +110,10 @@ def cal_spatial_exp(
     if layer_key is not None:
         data_raw = adata.obsm[layer_key].copy()
     else:
-        data_raw = adata.X.copy()
+        if issparse(adata.X):
+            data_raw = adata.X.toarray().copy()
+        else:
+            data_raw = adata.X.copy()
     data_nbr = []
     for i in range(indices.shape[0]):
         data_nbr_tmp = data_raw[indices[i]].mean(axis=0)
@@ -192,10 +196,23 @@ def construct_graph(
     return g
 
 
+# left_cell_num < batch_size
 def random_split(n, m):
     nums = list(range(n))
     random.shuffle(nums)
     return [nums[i:i + m] for i in range(0, n, m)]
+
+
+# left_cell_num > batch_size
+def random_split2(n, batch_num):
+    nums = list(range(n))
+    random.shuffle(nums)
+
+    batch_size = n // (batch_num + 1)
+    result = [nums[i * batch_size: (i + 1) * batch_size] for i in range(batch_num)]
+    result.append(nums[batch_num * batch_size:])
+
+    return result
 
 
 def set_seed():
@@ -210,21 +227,15 @@ def set_seed():
 
 
 class myDataset(Dataset):
-    def __init__(self, g1, g2, g3):
-        self.g1 = g1
-        self.g2 = g2
-        self.g3 = g3
+    def __init__(self, g_list):
+        self.g_list = g_list
 
     def __getitem__(self, idx):
 
-        tmp_g1 = self.g1[idx]
-        tmp_g2 = self.g2[idx]
-        tmp_g3 = self.g3[idx]
-
-        return tmp_g1, tmp_g2, tmp_g3
+        return tuple(g[idx] for g in self.g_list)
 
     def __len__(self):
-        return len(self.g1)
+        return len(self.g_list[0])
 
 
 
