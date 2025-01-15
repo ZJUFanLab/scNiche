@@ -2,7 +2,7 @@
 
 ## Identification and characterization of cell niches in tissue from spatial omics data at single-cell resolution
 
-[![python >=3.9](https://img.shields.io/badge/python-%3E%3D3.9-brightgreen)](https://www.python.org/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13161096.svg)](https://doi.org/10.5281/zenodo.13161096)
+[![python >=3.9](https://img.shields.io/badge/python-%3E%3D3.9-brightgreen)](https://www.python.org/) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14195486.svg)](https://doi.org/10.5281/zenodo.14195486)
 
 scNiche is a computational framework to identify and characterize cell niches from single-cell spatial omics data
 
