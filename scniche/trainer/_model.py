@@ -1,3 +1,8 @@
+# The source code from CMGEC (https://github.com/wangemm/CMGEC-TMM-2021) was reused in this project.
+# We obtained formal written permission from the original authors to reuse and adapt their code.
+# This project is licensed under the GPL-3.0 License.
+
+
 import scipy.sparse as sp
 import torch
 import torch.nn as nn
