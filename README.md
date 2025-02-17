@@ -105,3 +105,5 @@ The scNiche model is developed based on the [multi-view clustering framework (CM
 ## About
 scNiche is developed by Jingyang Qian. Should you have any questions, please contact Jingyang Qian at qianjingyang@zju.edu.cn.
 
+## References
+Qian, J., Shao, X., Bao, H. et al. Identification and characterization of cell niches in tissue from spatial omics data at single-cell resolution. Nat Commun 16, 1693 (2025). [https://doi.org/10.1038/s41467-025-57029-9](https://doi.org/10.1038/s41467-025-57029-9)
