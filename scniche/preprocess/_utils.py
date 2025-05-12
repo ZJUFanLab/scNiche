@@ -46,7 +46,7 @@ def cal_spatial_neighbors(
         celltype_order = sorted(meta[celltype_key].unique())
 
     meta[celltype_key] = pd.Categorical(meta[celltype_key], categories=celltype_order, ordered=True)
-    meta = pd.concat([meta, pd.get_dummies(meta[celltype_key])], 1)
+    meta = pd.concat([meta, pd.get_dummies(meta[celltype_key])], axis=1)
     celltype = celltype_order
     values = meta[celltype].values
 
