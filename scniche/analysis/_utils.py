@@ -20,7 +20,11 @@ def enrichment(adata: AnnData, id_key: str, val_key: str, library_key: Optional[
         obs[library_key] = 1
     library_list = sorted(list(set(obs[library_key])))
 
-    df = obs.groupby([library_key, id_key, val_key]).size().unstack().fillna(0)
+    df = pd.crosstab(
+        index=[obs[library_key], obs[id_key]],
+        columns=obs[val_key],
+        dropna=False
+    )
     df_list = []
     for i in library_list:
         df_tmp = df.loc[(i,)]
