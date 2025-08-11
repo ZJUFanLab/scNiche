@@ -35,6 +35,26 @@ def cluster_stability(
         max_runs: int = 10,
         convergence_tol: float = 1e-2,
         similarity_function: callable = None):
+    """
+    Compute the stability of clustering results across multiple runs.
+    Args:
+        adata: AnnData
+            AnnData object.
+        n_clusters: tuple
+            A tuple defining the range of cluster numbers to test (e.g., (2, 20)).
+        use_rep: str
+            Key in `adata.obsm` that defining the representations of cells to use for clustering.
+        max_runs: int
+            Maximum number of runs to perform for stability calculation.
+        convergence_tol: float
+            Convergence tolerance for stability calculation.
+        similarity_function: callable
+            A function to compute the similarity between two clustering results (default is Fowlkes-Mallows score).
+    Returns:
+        Clusters stability results stored in `adata.uns`:
+            - `robustness_df`: DataFrame with stability scores for each cluster number.
+            - `best_k`: The optimal candidates of the number of clusters based on stability scores.
+    """
     n_clusters = list(range(*(max(1, n_clusters[0] - 1), n_clusters[1] + 2)))
     X = adata.obsm[use_rep]
     random_state = 0
@@ -111,6 +131,26 @@ def clustering(adata: AnnData,
                use_rep: str = 'X_scniche',
                add_key: str = 'scNiche',
                ):
+    """
+    Perform unsupervised clustering algorithms to identified cell niches.
+    Args:
+        adata: AnnData
+            AnnData object.
+        target_k: int
+            Target number of cell niches to be clustered.
+        clustering_method:
+            Unsupervised clustering algorithms to use ('kmeans' or 'leiden').
+        resolution:
+            Resolution parameter for Leiden clustering.
+        n_neighbor:
+            Number of neighbors for Leiden clustering.
+        use_rep:
+            Key in `adata.obsm` that defining the representations of cells to use for clustering.
+        add_key:
+            Key of clustering results added to `adata.obs`.
+    Returns:
+        AnnData object with clustering results stored in `adata.obs[add_key]`.
+    """
     assert (clustering_method.lower() in ['kmeans', 'leiden']), 'clustering_method must be `kmeans` or `leiden`!'
     X = adata.obsm[use_rep]
     label = None
@@ -134,4 +174,3 @@ def clustering(adata: AnnData,
     adata.obs[add_key] = pd.Categorical(adata.obs[add_key], categories=category, ordered=True)
 
     return adata
-

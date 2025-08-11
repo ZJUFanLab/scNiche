@@ -17,6 +17,22 @@ class Runner:
             device: str = 'cuda:0',
             verbose: bool = True
     ):
+        """
+        Initialize the Runner class for training scNihce model.
+        Args:
+            adata: AnnData
+                Anndata object.
+            choose_views: Optional[list]
+                List of views to use for training. If None, defaults to ['X_cn_norm', 'X_data', 'X_data_nbr'].
+            hidden_size_v: Optional[list]
+                Hidden layer sizes for the view-specific encoders.
+            hidden_size: Optional[list]
+                Hidden layer sizes for the shared encoder.
+            device: str
+                Device to run the model on (e.g., 'cuda:0' or 'cpu').
+            verbose: bool
+                Whether to print detailed information during training.
+        """
         self.adata = adata
         self.choose_views = choose_views
         if self.choose_views is None:
@@ -62,6 +78,17 @@ class Runner:
             print("Mutual Information Matrix Size for training: {}".format(self.mik.shape))
 
     def fit(self, lr: Optional[float] = 0.01, epochs: Optional[int] = 100, ):
+        """
+        Fit the scNiche model.
+        Args:
+            lr: Optional[float]
+                Learning rate for the optimizer.
+            epochs: Optional[int]
+                Number of training epochs.
+        Returns:
+            adata: AnnData
+                Anndata object with learned embeddings (stored in `adata.obsm['X_scniche']`) and training loss (stored in `adata.uns['loss']`).
+        """
 
         # to device
         self.feat = [feat.to(self.device) for feat in self.feat]
@@ -133,6 +160,9 @@ class Runner_batch:
             device: str = 'cuda:0',
             verbose: bool = True
     ):
+        """
+        Initialize the Runner_batch class for training scNihce model with batch training strategy.
+        """
         self.adata = adata
         self.dataloader = self.adata.uns['dataloader']
         self.choose_views = choose_views

@@ -1,4 +1,4 @@
-# scNiche v1.1.0
+# scNiche v1.1.1
 
 ## Identification and characterization of cell niches in tissue from spatial omics data at single-cell resolution
 
@@ -10,6 +10,12 @@ scNiche is a computational framework to identify and characterize cell niches fr
 
 ## Requirements and Installation
 [![anndata 0.10.1](https://img.shields.io/badge/anndata-0.10.1-success)](https://pypi.org/project/anndata/) [![pandas 1.5.0](https://img.shields.io/badge/pandas-1.5.0-important)](https://pypi.org/project/pandas/) [![squidpy 1.2.3](https://img.shields.io/badge/squidpy-1.2.3-critical)](https://pypi.org/project/squidpy/) [![scanpy 1.9.1](https://img.shields.io/badge/scanpy-1.9.1-informational)](https://github.com/scverse/scanpy) [![dgl 1.1.0+cu113](https://img.shields.io/badge/dgl-1.1.0%2Bcu113-blueviolet)](https://www.dgl.ai/)  [![torch 1.21.1+cu113](https://img.shields.io/badge/torch-1.12.1%2Bcu113-%23808080)](https://pytorch.org/get-started/locally/) [![matplotlib 3.6.2](https://img.shields.io/badge/matplotlib-3.6.2-ff69b4)](https://pypi.org/project/matplotlib/) [![seaborn 0.13.0](https://img.shields.io/badge/seaborn-0.13.0-9cf)](https://pypi.org/project/seaborn/) 
+
+## Major updates in v1.1.1
+scNiche now allows users to perform cell type enrichment analysis and visualization for low-resolution spatial transcriptomics data (make sure the cell type deconvolution results provided):
+   * Add `enrichment_spot()` function and `stacked_barplot_spot()` function.
+   * Tutorial: [Demonstration of enrichment analysis on human DLPFC 10X Visium data](tutorial/tutorial_DLPFC-analysis.ipynb) 
+
 
 ### Create and activate conda environment with requirements installed.
 For scNiche, the Python version need is over 3.9. If you have already installed a lower version of Python, consider installing Anaconda, and then you can create a new environment.

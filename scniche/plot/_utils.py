@@ -59,6 +59,9 @@ def _melt_df(df: DataFrame, library_key: str, select_niche: Optional[list] = Non
 
 def stacked_barplot(adata: AnnData, x_axis: str, y_axis: str, mode: str = 'proportion', palette: Optional[list] = None,
                     save: bool = False, save_dir: str = '', kwargs: dict = {}):
+    """
+    Stacked barplot for visualizing the proportion or absolute number of cell types in each niche.
+    """
     assert (mode.lower() in ['proportion', 'absolute']), 'mode should be either `proportion` or `absolute`!'
 
     length = len(adata.obs[y_axis].astype('category').cat.categories)
@@ -76,9 +79,40 @@ def stacked_barplot(adata: AnnData, x_axis: str, y_axis: str, mode: str = 'propo
         plt.savefig(save_dir, format='svg')
 
 
+def stacked_barplot_spot(adata: AnnData, x_axis: str, y_axis: str, y_axis_labels: list, mode: str = 'proportion', palette: Optional[list] = None,
+                         save: bool = False, save_dir: str = '', kwargs: dict = {}):
+    """
+    Stacked barplot for visualizing the proportion or absolute number of cell types in each niche.
+    This function is specifically designed for spot level data where the deconvoluted results stored in `adata.obsm['y_axis']`.
+    """
+    assert (mode.lower() in ['proportion', 'absolute']), 'mode should be either `proportion` or `absolute`!'
+
+    length = adata.obsm[y_axis].shape[1]
+    if y_axis_labels is None:
+        y_axis_labels = ['y_' + str(i) for i in range(length)]
+    assert (len(y_axis_labels == length)), 'the length of y_axis_labels should equal with the nums of categories y_axis represents'
+
+    if palette is None:
+        palette = _set_palette(length=length)
+    df = pd.DataFrame(adata.obsm[y_axis], index=adata.obs_names, columns=y_axis_labels)
+    df[[x_axis, ]] = adata.obs[[x_axis, ]]
+    df = df.groupby([x_axis]).sum()
+    if mode.lower() == 'proportion':
+        df = df.div(df.sum(axis=1), axis=0)
+    # plot
+    ax = df.plot(kind='bar', stacked=True, width=0.75, color=palette, linewidth=0, **kwargs)
+    ax.legend(bbox_to_anchor=(1, 0.5), loc='center left',
+              ncol=(1 if length <= 14 else 2 if length <= 30 else 3), frameon=False)
+    if save:
+        plt.savefig(save_dir, format='svg')
+
+
 def enrichment_heatmap(adata: AnnData, id_key: str, val_key: str, binarized: bool = False, show_pval: bool = False,
                        col_order: Optional[list] = None, row_order: Optional[list] = None, anno_key: Optional[str] = None,
                        anno_palette: Optional[list] = None, save: bool = False, save_dir: str = '', kwargs: dict = {}):
+    """
+    Heatmap for visualizing the enrichment of cell types in each niche.
+    """
 
     obs = adata.obs.copy()
 
@@ -154,6 +188,9 @@ def enrichment_heatmap(adata: AnnData, id_key: str, val_key: str, binarized: boo
 def multi_lineplot(adata: AnnData, library_key: str, show_list: list, mode: str = 'composition', select_niche: Optional[list] = None,
                    order: Optional[list] = None, palette: Optional[list] = None,
                    save: bool = False, save_dir: str = '', kwargs: dict = {}):
+    """
+    Lineplot for visualizing the trend of cell type composition or expression across niches.
+    """
     assert (mode.lower() in ['composition', 'expression']), 'mode should be either `composition` or `expression`!'
 
     if mode.lower() == 'composition':
@@ -181,6 +218,9 @@ def multi_lineplot(adata: AnnData, library_key: str, show_list: list, mode: str 
 def multi_boxplot(adata: AnnData, library_key: str, show_list: list, mode: str = 'composition', select_niche: Optional[list] = None,
                   order: Optional[list] = None, palette: Optional[list] = None, show_scatter: bool = True,
                   save: bool = False, save_dir: str = '', boxplot_kwargs: dict = {}, scatter_kwargs: dict = {}):
+    """
+    Boxplot for visualizing the distribution of cell type composition or expression across niches.
+    """
     assert (mode.lower() in ['composition', 'expression']), 'mode should be either `composition` or `expression`!'
 
     if mode.lower() == 'composition':
@@ -212,6 +252,9 @@ def multi_boxplot(adata: AnnData, library_key: str, show_list: list, mode: str =
 def multi_linrplot_group(adata: AnnData, library_key: str, show: str, group1: list, group2: list, group1_niche: Optional[list] = None,
                          group2_niche: Optional[list] = None, mode: str = 'composition', group_name_list: Optional[list] = None,
                          palette: Optional[list] = None, save: bool = False, save_dir: str = '', kwargs: dict = {}):
+    """
+    Lineplot for visualizing the trend of cell type composition or expression across niches in two groups.
+    """
     assert (mode.lower() in ['composition', 'expression']), 'mode should be either `composition` or `expression`!'
 
     if mode.lower() == 'composition':
@@ -250,12 +293,3 @@ def multi_linrplot_group(adata: AnnData, library_key: str, show: str, group1: li
 
     if save:
         plt.savefig(save_dir, format='svg')
-
-
-
-
-
-
-
-
-

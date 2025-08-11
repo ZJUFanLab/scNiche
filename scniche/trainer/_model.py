@@ -146,4 +146,3 @@ class Discriminator(nn.Module):
     def forward(self, z):
         out = self.discriminator(z)
         return out
-

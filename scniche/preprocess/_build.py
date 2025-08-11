@@ -10,6 +10,23 @@ def prepare_data(
         mik_graph: int = 5,
         verbose: bool = True
 ):
+    """
+    Prepare training data by constructing graphs for each view.
+    Args:
+        adata: AnnData
+            Anndata object.
+        choose_views: Optional[list], defaults to None.
+            A list of views to construct graphs for. If None, defaults to ['X_cn_norm', 'X_data', 'X_data_nbr'].
+        k_cutoff_graph: int, defaults to 20.
+            The number of nearest neighbors to consider when constructing the graph.
+        mik_graph: int, defaults to 5.
+            The minimum number of nearest neighbors identified for each sample in the multi-view mutual information maximization (MMIM) module.
+        verbose: bool, defaults to True.
+            Whether to print progress messages.
+    Returns:
+        adata: AnnData
+            The updated Anndata object with constructed graphs stored in `adata.uns`.
+    """
     if verbose:
         print("-------Constructing graph for each view...")
     if choose_views is None:
@@ -38,6 +55,25 @@ def prepare_data_batch(
         mik_graph: int = 5,
         verbose: bool = True
 ):
+    """
+    Prepare training data by constructing graphs for each view for batch training strategy.
+    Args:
+        adata: AnnData
+            Anndata object.
+        choose_views: Optional[list], defaults to None.
+            A list of views to construct graphs for. If None, defaults to ['X_cn_norm', 'X_data', 'X_data_nbr'].
+        batch_num: int, defaults to 4.
+            The number of batches (subgraphs) to split for batch training.
+        k_cutoff_graph: int, defaults to 20.
+            The number of nearest neighbors to consider when constructing the graph.
+        mik_graph: int, defaults to 5.
+            The minimum number of nearest neighbors identified for each sample in the multi-view mutual information maximization (MMIM) module.
+        verbose: bool, defaults to True.
+            Whether to print progress messages.
+    Returns:
+        adata: AnnData
+            The updated Anndata object with constructed graphs stored in `adata.uns['g_*']` and dataloader in `adata.uns['dataloader']`.
+    """
     # create batch idx
     random.seed(123)
     batch_size = adata.shape[0] // batch_num

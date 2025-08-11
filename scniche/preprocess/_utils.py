@@ -32,6 +32,29 @@ def cal_spatial_neighbors(
         rad_cutoff: Optional[float] = 20,
         k_cutoff: Optional[float] = 20,
         verbose: bool = True):
+    """
+    Calculate Cellular Neighborhoods (CNs) for each cell based on spatial coordinates.
+    Args:
+        adata: AnnData
+            Anndata object.
+        celltype_key: str, defaults to 'Cell_type'.
+            Key in `adata.obs` that defining cell types.
+        celltype_order: Optional[list], defaults to None.
+            A list defining the order of cell types. If None, the order will be determined automatically.
+        mode: str, defaults to 'KNN'.
+            Method to identify neighboring cells. Options are 'radius' or 'KNN'.
+        rad_cutoff: Optional[float], defaults to 20.
+            Radius cutoff for 'radius' mode.
+        k_cutoff: Optional[float], defaults to 20.
+            Number of nearest neighbors for 'KNN' mode.
+        verbose: bool, defaults to True.
+            Whether to print progress messages.
+    Returns:
+        CNs results stored in `adata.obsm`:
+            - 'X_cn': Raw counts of neighboring cell types for each cell.
+            - 'X_cn_norm': Normalized counts of neighboring cell types for each cell.
+        CN order stored in `adata.uns['CN_order']`.
+    """
 
     assert (mode.lower() in ['radius', 'knn']), 'mode must be `radius` or `knn`!'
     if verbose:
@@ -90,6 +113,30 @@ def cal_spatial_exp(
         rad_cutoff: Optional[float] = 20,
         k_cutoff: Optional[float] = 20,
         verbose: bool = True):
+    """
+    Calculate the average expression of neighboring cells for each cell based on spatial coordinates.
+    Args:
+        adata: AnnData
+            Anndata object.
+        layer_key: Optional[str], defaults to None.
+            Key in `adata.layers` that defining the expression layer. If None, `adata.X` will be used.
+        is_pca: bool, defaults to False.
+            Whether to perform PCA on the raw and neighboring expression data.
+        n_comps: int, defaults to 50.
+            Number of PCA components to compute if `is_pca` is True.
+        mode: str, defaults to 'KNN'.
+            Method to identify neighboring cells. Options are 'radius' or 'KNN'.
+        rad_cutoff: Optional[float], defaults to 20.
+            Radius cutoff for 'radius' mode.
+        k_cutoff: Optional[float], defaults to 20.
+            Number of nearest neighbors for 'KNN' mode.
+        verbose: bool, defaults to True.
+            Whether to print progress messages.
+    Returns:
+        Expression results stored in `adata.obsm`:
+            - 'X_data': Raw expression data for each cell.
+            - 'X_data_nbr': Average expression data of neighboring cells for each cell.
+    """
 
     assert (mode.lower() in ['radius', 'knn']), 'mode must be `radius` or `knn`!'
     # adata.layers['data'] = adata.X.copy()
@@ -144,6 +191,32 @@ def process_multi_slices(
         is_pca: bool = False,
         n_comps: int = 50,
         verbose: bool = True):
+    """
+    integration function of `cal_spatial_neighbors` and `cal_spatial_exp` for processing multiple samples.
+    Args:
+        adata: AnnData
+            Anndata object.
+        celltype_key: str, defaults to 'Cell_type'.
+            Key in `adata.obs` that defining cell types.
+        sample_key: str, defaults to 'Sample'.
+            Key in `adata.obs` that defining samples/libraries.
+        mode: str, defaults to 'KNN'.
+            Method to identify neighboring cells. Options are 'radius' or 'KNN'.
+        rad_cutoff: Optional[float], defaults to 20.
+            Radius cutoff for 'radius' mode.
+        k_cutoff: Optional[float], defaults to 20.
+            Number of nearest neighbors for 'KNN' mode.
+        layer_key: Optional[str], defaults to None.
+            Key in `adata.layers` that defining the expression layer. If None, `adata.X` will be used.
+        is_pca: bool, defaults to False.
+            Whether to perform PCA on the raw and neighboring expression data.
+        n_comps: int, defaults to 50.
+            Number of PCA components to compute if `is_pca` is True.
+        verbose: bool, defaults to True.
+            Whether to print progress messages.
+    Returns:
+        Updated AnnData object with CNs and neighboring expression results.
+    """
 
     celltype_order = sorted(list(set(adata.obs[celltype_key])))
     sample_list = sorted(list(set(adata.obs[sample_key])))
@@ -236,6 +309,3 @@ class myDataset(Dataset):
 
     def __len__(self):
         return len(self.g_list[0])
-
-
-
